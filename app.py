@@ -3,142 +3,125 @@ from fpdf import FPDF
 from PIL import Image
 import io
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="B.O. FÁCIL V3", layout="wide")
+# 1. CONFIGURAÇÃO MÍNIMA
+st.set_page_config(page_title="B.O. FÁCIL OFICIAL", layout="wide")
 
-st.markdown("""
-    <style>
-    .stApp { background: #1A334A; color: white; }
-    .stButton>button { background: #18A3B7 !important; color: white !important; font-weight: bold !important; width: 100%; }
-    </style>
-    """, unsafe_allow_html=True)
+# Estilo para as cores da polícia
+st.markdown("<style>.stApp {background-color: #1A334A; color: white;} .stButton>button {background-color: #18A3B7; color: white;}</style>", unsafe_allow_html=True)
 
-# --- FUNÇÃO DE TRATAMENTO DE TEXTO ---
-def limpar_texto(txt):
-    if not txt: return ""
-    return str(txt).encode('latin-1', 'replace').decode('latin-1')
+# 2. FUNÇÃO DE APOIO (Limpa erros de acento)
+def formatar(texto):
+    if not texto: return ""
+    return str(texto).encode('latin-1', 'replace').decode('latin-1')
 
-# --- CLASSE DO PDF ---
-class MeuPDF(FPDF):
-    def header(self):
-        self.set_font('Arial', 'B', 10)
-        self.set_text_color(150, 150, 150)
-        if self.page_no() > 1:
-            self.cell(0, 10, f'Folha {self.page_no()}', 0, 1, 'R')
-
-def criar_relatorio(titulo, eq, vits, tests, susps, relato_final, f_s, f_m):
-    pdf = MeuPDF()
+# 3. GERADOR DE PDF MELHORADO
+def criar_documento(tipo, local, vits, tests, susps, hist, img_s, img_m):
+    pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     
     # Cabeçalho
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(190, 12, limpar_texto(titulo.upper()), 1, 1, 'C')
+    pdf.cell(190, 15, formatar(tipo.upper()), 1, 1, 'C')
     pdf.ln(5)
 
-    def add_bloco(t, lista):
+    # Função para blocos de texto
+    def bloco(titulo, lista):
         if lista:
             pdf.set_font("Arial", 'B', 11)
             pdf.set_fill_color(230, 230, 240)
-            pdf.cell(190, 8, limpar_texto(t), 0, 1, 'L', fill=True)
+            pdf.cell(190, 8, formatar(titulo), 0, 1, 'L', fill=True)
             pdf.set_font("Arial", size=10)
             pdf.ln(2)
-            for item in lista:
-                pdf.multi_cell(0, 6, limpar_texto(item), 0, 'L')
+            for linha in lista:
+                pdf.multi_cell(0, 6, formatar(linha), 0, 'L')
             pdf.ln(4)
 
-    # 1. Equipe
-    add_bloco("DADOS DA EQUIPE", [f"Viatura: {eq['v']}", f"Local: {eq['l']}", f"Agentes: {eq['a']}"])
-    
-    # 2. Vítimas
-    add_bloco("VÍTIMAS", vits)
+    bloco("DADOS DA EQUIPE", [f"Viatura: {local['v']}", f"Local: {local['l']}", f"Agentes: {local['a']}"])
+    bloco("VÍTIMAS", vits)
+    bloco("TESTEMUNHAS", tests)
+    bloco("SUSPEITOS", susps)
 
-    # 3. Testemunhas
-    add_bloco("TESTEMUNHAS", tests)
-        
-    # 4. Suspeitos
-    add_bloco("SUSPEITOS", susps)
-
-    # 5. Histórico
+    # Relato (Ocupa a largura toda e pula página)
     pdf.set_font("Arial", 'B', 11)
     pdf.set_fill_color(230, 230, 240)
     pdf.cell(190, 8, "HISTÓRICO DA OCORRÊNCIA", 0, 1, 'L', fill=True)
     pdf.ln(2)
     pdf.set_font("Arial", 'B', 10)
-    pdf.cell(0, 6, limpar_texto(f"NATUREZA: {relato_final['n']}"), 0, 1, 'L')
+    pdf.cell(0, 6, formatar(f"NATUREZA: {hist['n']}"), 0, 1, 'L')
     pdf.ln(2)
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 6, limpar_texto(relato_final['r']), 0, 'L')
+    pdf.multi_cell(0, 6, formatar(hist['r']), 0, 'L')
     
-    if relato_final['m']:
-        pdf.ln(4)
+    if hist['m']:
+        pdf.ln(5)
         pdf.set_font("Arial", 'B', 10)
-        pdf.cell(0, 6, "MATERIAIS:", 0, 1, 'L')
-        pdf.set_font("Arial", size=10)
-        pdf.multi_cell(0, 6, limpar_texto(relato_final['m']), 0, 'L')
+        pdf.cell(0, 6, "MATERIAIS/APREENSÕES:", 0, 1, 'L')
+        pdf.multi_cell(0, 6, formatar(hist['m']), 0, 'L')
 
-    # 6. Fotos
-    for f, label in [(f_s, "SUSPEITO"), (f_m, "MATERIAL")]:
+    # Fotos (Página exclusiva)
+    for f, label in [(img_s, "SUSPEITO"), (img_m, "MATERIAL")]:
         if f:
             pdf.add_page()
-            pdf.set_font("Arial", 'B', 12)
-            pdf.cell(0, 10, limpar_texto(f"FOTO {label}"), 0, 1, 'C')
-            img = Image.open(f).convert("RGB")
-            img_io = io.BytesIO()
-            img.save(img_io, format='JPEG')
-            img_io.seek(0)
-            pdf.image(img_io, x=15, y=30, w=180)
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(0, 10, formatar(f"FOTO {label}"), 0, 1, 'C')
+            pic = Image.open(f).convert("RGB")
+            buf = io.BytesIO()
+            pic.save(buf, format='JPEG')
+            buf.seek(0)
+            pdf.image(buf, x=15, y=30, w=180)
 
     return pdf.output(dest='S')
 
-# --- INTERFACE ---
+# 4. INTERFACE (ABAS)
 st.title("🛡️ B.O. FÁCIL")
 
-tabs = st.tabs(["📍 Local", "👤 Vítimas", "👥 Testemunhas", "🚨 Suspeitos", "📖 Relato", "🏁 Finalizar"])
+t1, t2, t3, t4, t5, t6 = st.tabs(["📍 Local", "👤 Vítimas", "👥 Testemunhas", "🚨 Suspeitos", "📖 Relato", "🏁 Finalizar"])
 
-with tabs:
-    vtr = st.text_input("Viatura", key="k_vtr")
-    loc = st.text_input("Endereço", key="k_loc")
-    gua = st.text_area("Agentes", key="k_gua")
+with t1:
+    viatura = st.text_input("Viatura", key="v_1")
+    endereco = st.text_input("Endereço", key="v_2")
+    equipe = st.text_area("Agentes", key="v_3")
 
-with tabs:
-    v_l = []
+with t2:
+    v_lista = []
     for i in range(1, 3):
-        n = st.text_input(f"Nome Vítima {i}", key=f"k_vn_{i}")
-        d = st.text_input(f"Doc Vítima {i}", key=f"k_vd_{i}")
-        if n: v_l.append(f"{n} (Doc: {d})")
+        n_v = st.text_input(f"Vítima {i} - Nome", key=f"vn_{i}")
+        d_v = st.text_input(f"Vítima {i} - CPF/RG", key=f"vd_{i}")
+        if n_v: v_lista.append(f"Vítima {i}: {n_v} (Doc: {d_v})")
 
-with tabs:
-    t_l = []
+with t3:
+    t_lista = []
     for i in range(1, 3):
-        tn = st.text_input(f"Nome Testemunha {i}", key=f"k_tn_{i}")
-        td = st.text_input(f"Doc Testemunha {i}", key=f"k_td_{i}")
-        if tn: t_l.append(f"{tn} (Doc: {td})")
+        n_t = st.text_input(f"Testemunha {i} - Nome", key=f"tn_{i}")
+        d_t = st.text_input(f"Testemunha {i} - CPF/RG", key=f"td_{i}")
+        if n_t: t_lista.append(f"Testemunha {i}: {n_t} (Doc: {d_t})")
 
-with tabs:
-    s_l = []
-    for i in range(1, 4):
+with t4:
+    s_lista = []
+    for i in range(1, 3):
         with st.expander(f"Suspeito {i}"):
-            sn = st.text_input(f"Nome S{i}", key=f"k_sn_{i}")
-            sm = st.text_input(f"Mãe S{i}", key=f"k_sm_{i}")
-            sd = st.text_input(f"Doc S{i}", key=f"k_sd_{i}")
-            if sn: s_l.append(f"Nome: {sn} | Mãe: {sm} | Doc: {sd}")
+            ns = st.text_input(f"Nome S{i}", key=f"sn_{i}")
+            ms = st.text_input(f"Mãe S{i}", key=f"sm_{i}")
+            ds = st.text_input(f"Doc S{i}", key=f"sd_{i}")
+            if ns: s_lista.append(f"Suspeito {i}: {ns} | Mãe: {ms} | Doc: {ds}")
 
-with tabs:
-    c_tco = ["Ameaça", "Lesão Corporal", "Desacato", "Dano"]
-    nat = st.selectbox("Natureza", c_tco + ["Roubo", "Tráfico", "Outros"], key="k_nat")
-    rel = st.text_area("Relato", height=250, key="k_rel")
-    mat = st.text_area("Objetos", key="k_mat")
+with t5:
+    naturezas = ["Ameaça", "Lesão Corporal", "Desacato", "Dano", "Vias de Fato", "Outros"]
+    nat = st.selectbox("Natureza", naturezas, key="nat_sel")
+    relato = st.text_area("Relato Completo", height=250, key="rel_campo")
+    apreensoes = st.text_area("Materiais", key="mat_campo")
 
-with tabs:
-    f1 = st.file_uploader("Foto Suspeito", type=['jpg','png'], key="k_f1")
-    f2 = st.file_uploader("Foto Material", type=['jpg','png'], key="k_f2")
+with t6:
+    f_susp = st.file_uploader("Foto Suspeito", type=['jpg','png'], key="f_1")
+    f_mat = st.file_uploader("Foto Material", type=['jpg','png'], key="f_2")
     
-    if st.button("GERAR DOCUMENTO AGORA"):
-        t_doc = "Termo Circunstanciado" if nat in c_tco else "Boletim de Ocorrência"
+    if st.button("GERAR PDF AGORA"):
+        tipo_bo = "Termo Circunstanciado" if nat != "Outros" else "Boletim de Ocorrência"
         try:
-            res_pdf = criar_relatorio(t_doc, {'v':vtr, 'l':loc, 'a':gua}, v_l, t_l, s_l, {'n':nat, 'r':rel, 'm':mat}, f1, f2)
-            st.download_button("⬇️ BAIXAR PDF", data=bytes(res_pdf), file_name="Relatorio.pdf", mime="application/pdf")
+            pdf_final = criar_documento(tipo_bo, {'v':viatura, 'l':endereco, 'a':equipe}, v_lista, t_lista, s_lista, {'n':nat, 'r':relato, 'm':apreensoes}, f_susp, f_mat)
+            st.download_button("⬇️ BAIXAR PDF", data=bytes(pdf_final), file_name="Relatorio.pdf", mime="application/pdf")
+            st.success("PDF Gerado com Sucesso!")
         except Exception as e:
-            st.error(f"Erro: {e}")
-            
+            st.error(f"Erro no sistema: {e}")
+    
