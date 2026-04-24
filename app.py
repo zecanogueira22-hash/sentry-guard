@@ -49,7 +49,7 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(190, 10, "B.O. FÁCIL - RELATÓRIO OPERACIONAL", 1, 1, 'C')
+    pdf.cell(190, 10, "B.O. FACIL - RELATORIO OPERACIONAL", 1, 1, 'C')
     pdf.ln(5)
 
     for secao, info in dados.items():
@@ -60,37 +60,28 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
         if isinstance(info, dict):
             for k, v in info.items():
                 if v: 
-                    # Limpa caracteres especiais/emojis que travam o PDF
-                    texto_limpo = f"{k}: {v}".encode('ascii', 'ignore').decode('ascii')
-                    pdf.multi_cell(190, 6, texto_limpo, 0, 'L')
+                    # Remove acentos para evitar conflito com fontes básicas do PDF
+                    texto = f"{k}: {v}".encode('ascii', 'ignore').decode('ascii')
+                    pdf.multi_cell(190, 6, texto, 0, 'L')
         pdf.ln(2)
 
-    # Anexo Foto Suspeito
-    if f_susp:
-        try:
-            pdf.add_page()
-            pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
-            img_s = Image.open(f_susp).convert("RGB")
-            img_byte_arr = io.BytesIO()
-            img_s.save(img_byte_arr, format='JPEG')
-            pdf.image(img_byte_arr, x=10, y=30, w=100)
-        except:
-            pass
-    
-    # Anexo Foto Material
-    if f_mat:
-        try:
-            pdf.add_page()
-            pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
-            img_m = Image.open(f_mat).convert("RGB")
-            img_byte_arr_m = io.BytesIO()
-            img_m.save(img_byte_arr_m, format='JPEG')
-            pdf.image(img_byte_arr_m, x=10, y=30, w=100)
-        except:
-            pass
+    # Fotos
+    for foto, titulo in [(f_susp, "SUSPEITO"), (f_mat, "MATERIAL")]:
+        if foto:
+            try:
+                pdf.add_page()
+                pdf.cell(190, 10, f"ANEXO - {titulo}", 0, 1, 'L')
+                img = Image.open(foto).convert("RGB")
+                img_path = f"{titulo.lower()}.jpg"
+                img.save(img_path)
+                pdf.image(img_path, x=10, y=30, w=100)
+            except: pass
 
-    # Retorno corrigido para evitar o TypeError
-    return pdf.output(dest='S').encode('latin-1')
+    # MÉTODO COMPATÍVEL COM TODAS AS VERSÕES
+    pdf_string = pdf.output(dest='S')
+    if isinstance(pdf_string, str):
+        return pdf_string.encode('latin-1')
+    return pdf_string
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
@@ -128,31 +119,23 @@ with t_suspeitos:
 
 with t_relato:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
-    tipo_crime = st.selectbox("Natureza da Ocorrência", [
-        "-- BAIXO POTENCIAL (TCO) --",
-        "Ameaça (Art. 147)", "Lesão Corporal Leve", "Desobediência / Desacato",
-        "-- MÉDIO/ALTO POTENCIAL (BO) --",
-        "Roubo (Art. 157)", "Furto Qualificado", "Tráfico de Drogas", "Homicídio / Tentativa",
-        "-- LEGISLAÇÃO ESPECIAL --",
-        "Lei Maria da Penha (Violência Doméstica)", "Estatuto do Desarmamento (Arma de Fogo)", "Crime Ambiental"
-    ])
+    tipo_crime = st.selectbox("Natureza da Ocorrência", ["Ameaça", "Lesão Corporal", "Roubo", "Furto", "Tráfico", "Maria da Penha", "Outros"])
     relato = st.text_area("Histórico da Ocorrência", height=150)
-    materiais = st.text_area("Materiais Apreendidos (Descritivo)")
+    materiais = st.text_area("Materiais Apreendidos")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with t_fotos:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
-    col_f1, col_f2 = st.columns(2)
-    f_susp = col_f1.file_uploader("📸 Foto do Suspeito", type=['jpg','png','jpeg'])
-    f_mat = col_f2.file_uploader("📸 Foto Apreensões", type=['jpg','png','jpeg'])
+    f_susp = st.file_uploader("📸 Foto do Suspeito", type=['jpg','png','jpeg'])
+    f_mat = st.file_uploader("📸 Foto Apreensões", type=['jpg','png','jpeg'])
     st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("🏁 FINALIZAR E GERAR PDF", use_container_width=True):
         resumo_dict = {
-            "1. EQUIPE E LOCAL": {"Viatura": prefixo, "Agentes": agentes, "Local": end_fato},
-            "2. VÍTIMAS": v_dados,
-            "3. SUSPEITOS": s_dados,
-            "4. OCORRÊNCIA": {"Natureza": tipo_crime, "Histórico": relato, "Apreensões": materiais}
+            "EQUIPE": {"Viatura": prefixo, "Agentes": agentes, "Local": end_fato},
+            "VITIMAS": v_dados,
+            "SUSPEITOS": s_dados,
+            "OCORRENCIA": {"Natureza": tipo_crime, "Histórico": relato, "Apreensões": materiais}
         }
         
         pdf_out = gerar_pdf_completo(resumo_dict, f_susp, f_mat)
@@ -160,27 +143,10 @@ with t_fotos:
         st.download_button(
             label="⬇️ 1. BAIXAR PDF B.O. FÁCIL",
             data=pdf_out,
-            file_name="BO_FACIL_RELATORIO.pdf",
+            file_name="BO_FACIL.pdf",
             mime="application/pdf"
         )
 
-        # --- BOTÃO WHATSAPP ---
-        msg = (
-            f"🛡️ *B.O. FÁCIL - RELATÓRIO OPERACIONAL*\n\n"
-            f"🚨 *NATUREZA:* {tipo_crime}\n"
-            f"📍 *LOCAL:* {end_fato}\n"
-            f"🚔 *VIATURA:* {prefixo}\n\n"
-            f"📂 *PDF pronto para envio.*"
-        )
+        msg = f"🛡️ *B.O. FÁCIL*\n🚨 *Natureza:* {tipo_crime}\n📍 *Local:* {end_fato}"
         url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
-        
-        st.markdown(f"""
-            <div style="margin-top: 15px;">
-                <a href="{url}" target="_blank" style="text-decoration: none;">
-                    <button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">
-                        📲 2. NOTIFICAR VIA WHATSAPP
-                    </button>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-        
+        st.markdown(f'<a href="{url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">📲 2. ENVIAR PELO WHATSAPP</button></a>', unsafe_allow_html=True)
