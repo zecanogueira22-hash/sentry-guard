@@ -1,7 +1,5 @@
 import streamlit as st
-import pandas as pd
 from fpdf import FPDF
-from datetime import datetime
 from PIL import Image
 import io
 import urllib.parse
@@ -19,29 +17,29 @@ st.set_page_config(
 )
 
 # --- ESTÉTICA TÁTICA ---
-st.markdown(f"""
+st.markdown("""
     <style>
-    .stApp {{ background: #1A334A; color: white; }}
-    .tactic-card {{
+    .stApp { background: #1A334A; color: white; }
+    .tactic-card {
         background: rgba(30, 83, 110, 0.4);
         padding: 15px;
         border-radius: 10px;
         border: 1px solid #18A3B7;
         margin-bottom: 10px;
-    }}
-    .section-title, h1, h2, h3 {{ color: #27E6EC !important; }}
-    .stTabs [aria-selected="true"] {{
+    }
+    .section-title, h1, h2, h3 { color: #27E6EC !important; }
+    .stTabs [aria-selected="true"] {
         background-color: #27E6EC !important;
         color: #1A334A !important;
         font-weight: bold;
-    }}
-    .stButton>button {{
+    }
+    .stButton>button {
         background: #18A3B7;
         color: white;
         border-radius: 8px;
         width: 100%;
         font-weight: bold;
-    }}
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -60,28 +58,33 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
         if isinstance(info, dict):
             for k, v in info.items():
                 if v: 
-                    # Remove acentos para evitar conflito com fontes básicas do PDF
                     texto = f"{k}: {v}".encode('ascii', 'ignore').decode('ascii')
                     pdf.multi_cell(190, 6, texto, 0, 'L')
         pdf.ln(2)
 
-    # Fotos
-    for foto, titulo in [(f_susp, "SUSPEITO"), (f_mat, "MATERIAL")]:
-        if foto:
-            try:
-                pdf.add_page()
-                pdf.cell(190, 10, f"ANEXO - {titulo}", 0, 1, 'L')
-                img = Image.open(foto).convert("RGB")
-                img_path = f"{titulo.lower()}.jpg"
-                img.save(img_path)
-                pdf.image(img_path, x=10, y=30, w=100)
-            except: pass
+    # Fotos (Método de salvamento temporário para evitar erros de memória)
+    if f_susp:
+        try:
+            pdf.add_page()
+            pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
+            img_s = Image.open(f_susp).convert("RGB")
+            img_s.save("temp_s.jpg")
+            pdf.image("temp_s.jpg", x=10, y=30, w=100)
+        except: pass
+    
+    if f_mat:
+        try:
+            pdf.add_page()
+            pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
+            img_m = Image.open(f_mat).convert("RGB")
+            img_m.save("temp_m.jpg")
+            pdf.image("temp_m.jpg", x=10, y=30, w=100)
+        except: pass
 
-    # MÉTODO COMPATÍVEL COM TODAS AS VERSÕES
-    pdf_string = pdf.output(dest='S')
-    if isinstance(pdf_string, str):
-        return pdf_string.encode('latin-1')
-    return pdf_string
+    # --- O PULO DO GATO PARA BYTES ---
+    # Geramos o PDF como uma string e codificamos em latin-1
+    pdf_output = pdf.output(dest='S').encode('latin-1')
+    return pdf_output
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
@@ -112,7 +115,7 @@ with t_suspeitos:
     s_dados = {}
     for i in range(1, 4):
         with st.expander(f"🚨 Dados do Suspeito 0{i}"):
-            sn = st.text_input(f"Nome/Alcunha (S{i})")
+            sn = st.text_input(f"Nome (S{i})")
             sd = st.text_input(f"Doc (S{i})")
             sm = st.text_input(f"Mãe (S{i})")
             s_dados[f"Suspeito 0{i}"] = f"Nome: {sn} | Doc: {sd} | Mãe: {sm}" if sn else ""
@@ -138,15 +141,24 @@ with t_fotos:
             "OCORRENCIA": {"Natureza": tipo_crime, "Histórico": relato, "Apreensões": materiais}
         }
         
-        pdf_out = gerar_pdf_completo(resumo_dict, f_susp, f_mat)
-        
-        st.download_button(
-            label="⬇️ 1. BAIXAR PDF B.O. FÁCIL",
-            data=pdf_out,
-            file_name="BO_FACIL.pdf",
-            mime="application/pdf"
-        )
+        try:
+            pdf_data = gerar_pdf_completo(resumo_dict, f_susp, f_mat)
+            
+            # CRIAMOS UM BUFFER DE BYTES REAL
+            buffer = io.BytesIO()
+            buffer.write(pdf_data)
+            buffer.seek(0)
+            
+            st.download_button(
+                label="⬇️ 1. BAIXAR PDF B.O. FÁCIL",
+                data=buffer,
+                file_name="BO_FACIL.pdf",
+                mime="application/pdf"
+            )
 
-        msg = f"🛡️ *B.O. FÁCIL*\n🚨 *Natureza:* {tipo_crime}\n📍 *Local:* {end_fato}"
-        url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
-        st.markdown(f'<a href="{url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold;">📲 2. ENVIAR PELO WHATSAPP</button></a>', unsafe_allow_html=True)
+            msg = f"🛡️ *B.O. FÁCIL*\n🚨 *Natureza:* {tipo_crime}\n📍 *Local:* {end_fato}"
+            url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
+            st.markdown(f'<a href="{url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📲 2. NOTIFICAR PELO WHATSAPP</button></a>', unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Erro ao gerar PDF: {e}")
+        
