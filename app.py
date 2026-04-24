@@ -8,7 +8,7 @@ import io
 # 1. NOME NA ABA E NO ÍCONE DO CELULAR
 st.set_page_config(
     page_title="B.O. FÁCIL", 
-    page_icon="🛡️", 
+    page_icon="20251007185025621.webp", 
     layout="wide"
 )
 
