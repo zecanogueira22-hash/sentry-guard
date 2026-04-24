@@ -10,7 +10,7 @@ try:
     # Ajustado para o nome que aparece no seu GitHub
     img_icone = Image.open("20251007185025621.webp")
 except:
-    img_icone = "🛡️"
+    img_icone = "20251007185025621.webp"
 
 st.set_page_config(
     page_title="B.O. FÁCIL", 
