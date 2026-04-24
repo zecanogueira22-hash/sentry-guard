@@ -6,7 +6,7 @@ from PIL import Image
 import io
 
 # Configuração Master
-st.set_page_config(page_title="Sentry Guard Full", layout="wide")
+st.set_page_config(page_title="BO FÁCIL", layout="wide")
 
 # --- APLICAÇÃO DA PALETA DE CORES (Luca Davincci) ---
 st.markdown(f"""
