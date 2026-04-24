@@ -47,6 +47,7 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
+    # Título sem acentos para evitar erros de fonte
     pdf.cell(190, 10, "B.O. FACIL - RELATORIO OPERACIONAL", 1, 1, 'C')
     pdf.ln(5)
 
@@ -58,33 +59,34 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
         if isinstance(info, dict):
             for k, v in info.items():
                 if v: 
+                    # Remove caracteres especiais que travam o PDF básico
                     texto = f"{k}: {v}".encode('ascii', 'ignore').decode('ascii')
                     pdf.multi_cell(190, 6, texto, 0, 'L')
         pdf.ln(2)
 
-    # Fotos (Método de salvamento temporário para evitar erros de memória)
-    if f_susp:
-        try:
-            pdf.add_page()
-            pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
-            img_s = Image.open(f_susp).convert("RGB")
-            img_s.save("temp_s.jpg")
-            pdf.image("temp_s.jpg", x=10, y=30, w=100)
-        except: pass
-    
-    if f_mat:
-        try:
-            pdf.add_page()
-            pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
-            img_m = Image.open(f_mat).convert("RGB")
-            img_m.save("temp_m.jpg")
-            pdf.image("temp_m.jpg", x=10, y=30, w=100)
-        except: pass
+    # Tratamento de Fotos
+    for foto, label in [(f_susp, "SUSPEITO"), (f_mat, "MATERIAL")]:
+        if foto:
+            try:
+                pdf.add_page()
+                pdf.cell(190, 10, f"ANEXO - {label}", 0, 1, 'L')
+                img = Image.open(foto).convert("RGB")
+                img_io = io.BytesIO()
+                img.save(img_io, format='JPEG')
+                img_io.seek(0)
+                # O FPDF aceita o objeto BytesIO diretamente em versões recentes
+                pdf.image(img_io, x=10, y=30, w=100)
+            except:
+                pass
 
-    # --- O PULO DO GATO PARA BYTES ---
-    # Geramos o PDF como uma string e codificamos em latin-1
-    pdf_output = pdf.output(dest='S').encode('latin-1')
-    return pdf_output
+    # --- LÓGICA DE SAÍDA CORINGA ---
+    saida = pdf.output(dest='S')
+    
+    # Se o PDF já for bytes/bytearray, retorna direto
+    if isinstance(saida, (bytes, bytearray)):
+        return saida
+    # Se for string, converte para bytes
+    return saida.encode('latin-1')
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
@@ -106,35 +108,30 @@ with t_vitimas:
         v1_n = st.text_input("Nome (V1)")
         v1_d = st.text_input("Doc (V1)")
         v_dados["Vítima 01"] = f"Nome: {v1_n} | Doc: {v1_d}" if v1_n else ""
-    with st.expander("👤 Dados da Vítima 02"):
-        v2_n = st.text_input("Nome (V2)")
-        v2_d = st.text_input("Doc (V2)")
-        v_dados["Vítima 02"] = f"Nome: {v2_n} | Doc: {v2_d}" if v2_n else ""
 
 with t_suspeitos:
     s_dados = {}
-    for i in range(1, 4):
+    for i in range(1, 3):
         with st.expander(f"🚨 Dados do Suspeito 0{i}"):
             sn = st.text_input(f"Nome (S{i})")
             sd = st.text_input(f"Doc (S{i})")
-            sm = st.text_input(f"Mãe (S{i})")
-            s_dados[f"Suspeito 0{i}"] = f"Nome: {sn} | Doc: {sd} | Mãe: {sm}" if sn else ""
+            s_dados[f"Suspeito 0{i}"] = f"Nome: {sn} | Doc: {sd}" if sn else ""
 
 with t_relato:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
-    tipo_crime = st.selectbox("Natureza da Ocorrência", ["Ameaça", "Lesão Corporal", "Roubo", "Furto", "Tráfico", "Maria da Penha", "Outros"])
-    relato = st.text_area("Histórico da Ocorrência", height=150)
-    materiais = st.text_area("Materiais Apreendidos")
+    tipo_crime = st.selectbox("Natureza", ["Ameaça", "Roubo", "Furto", "Tráfico", "Maria da Penha", "Outros"])
+    relato = st.text_area("Histórico", height=150)
+    materiais = st.text_area("Apreensões")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with t_fotos:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
-    f_susp = st.file_uploader("📸 Foto do Suspeito", type=['jpg','png','jpeg'])
-    f_mat = st.file_uploader("📸 Foto Apreensões", type=['jpg','png','jpeg'])
+    f_susp = st.file_uploader("📸 Foto Suspeito", type=['jpg','png','jpeg'])
+    f_mat = st.file_uploader("📸 Foto Materiais", type=['jpg','png','jpeg'])
     st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("🏁 FINALIZAR E GERAR PDF", use_container_width=True):
-        resumo_dict = {
+        resumo = {
             "EQUIPE": {"Viatura": prefixo, "Agentes": agentes, "Local": end_fato},
             "VITIMAS": v_dados,
             "SUSPEITOS": s_dados,
@@ -142,23 +139,18 @@ with t_fotos:
         }
         
         try:
-            pdf_data = gerar_pdf_completo(resumo_dict, f_susp, f_mat)
-            
-            # CRIAMOS UM BUFFER DE BYTES REAL
-            buffer = io.BytesIO()
-            buffer.write(pdf_data)
-            buffer.seek(0)
+            pdf_bytes = gerar_pdf_completo(resumo, f_susp, f_mat)
             
             st.download_button(
                 label="⬇️ 1. BAIXAR PDF B.O. FÁCIL",
-                data=buffer,
+                data=pdf_bytes,
                 file_name="BO_FACIL.pdf",
                 mime="application/pdf"
             )
 
             msg = f"🛡️ *B.O. FÁCIL*\n🚨 *Natureza:* {tipo_crime}\n📍 *Local:* {end_fato}"
             url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
-            st.markdown(f'<a href="{url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📲 2. NOTIFICAR PELO WHATSAPP</button></a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{url}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📲 2. NOTIFICAR WHATSAPP</button></a>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Erro ao gerar PDF: {e}")
+            st.error(f"Erro ao processar: {e}")
         
