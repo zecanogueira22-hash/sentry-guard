@@ -4,13 +4,13 @@ from fpdf import FPDF
 from datetime import datetime
 from PIL import Image
 import io
+import urllib.parse
 
-# 1. CONFIGURAÇÃO DE NOME E ÍCONE (COM O NOME CORRETO DA IMAGEM)
+# 1. CONFIGURAÇÃO DE NOME E ÍCONE
 try:
-    # Ajustado para o nome que aparece no seu GitHub
     img_icone = Image.open("20251007185025621.webp")
 except:
-    img_icone = "20251007185025621.webp"
+    img_icone = "🛡️"
 
 st.set_page_config(
     page_title="B.O. FÁCIL", 
@@ -78,7 +78,7 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
-# Estrutura de Abas
+# Estrutura de Abas (Tudo mantido!)
 t_geral, t_vitimas, t_suspeitos, t_relato, t_fotos = st.tabs([
     "📍 Local/Guarnição", "👤 Vítimas", "🚨 Suspeitos", "📖 Relato/Apreensão", "📄 Finalizar"
 ])
@@ -140,5 +140,36 @@ with t_fotos:
             "4. OCORRÊNCIA": {"Natureza": tipo_crime, "Histórico": relato, "Apreensões": materiais}
         }
         pdf = gerar_pdf_completo(resumo, f_susp, f_mat)
-        st.download_button("⬇️ BAIXAR PDF B.O. FÁCIL", data=pdf, file_name="BO_FACIL_RELATORIO.pdf")
+        st.download_button("⬇️ 1. BAIXAR PDF B.O. FÁCIL", data=pdf, file_name="BO_FACIL_RELATORIO.pdf")
+
+        # --- BOTÃO WHATSAPP ---
+        resumo_texto = (
+            f"🛡️ *B.O. FÁCIL - RELATÓRIO OPERACIONAL*\n\n"
+            f"🚨 *NATUREZA:* {tipo_crime}\n"
+            f"📍 *LOCAL:* {end_fato}\n"
+            f"🚔 *VIATURA:* {prefixo}\n"
+            f"👥 *EQUIPE:* {agentes}\n\n"
+            f"📂 *O arquivo PDF completo foi gerado e está pronto para envio.*"
+        )
+        texto_url = urllib.parse.quote(resumo_texto)
+        
+        st.markdown(f"""
+            <div style="margin-top: 15px;">
+                <a href="https://wa.me/?text={texto_url}" target="_blank" style="text-decoration: none;">
+                    <button style="
+                        width:100%; 
+                        background-color:#25D366; 
+                        color:white; 
+                        border:none; 
+                        padding:12px; 
+                        border-radius:8px; 
+                        font-weight:bold; 
+                        font-size: 16px;
+                        cursor:pointer;
+                        box-shadow: 0px 4px 6px rgba(0,0,0,0.2);">
+                        📲 2. NOTIFICAR VIA WHATSAPP
+                    </button>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
     
