@@ -29,30 +29,30 @@ def gerar_pdf_operacional(titulo_dinamico, dados, f_susp, f_mat):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
     
-    # Cabeçalho Centralizado
+    # Cabeçalho
+    pdf.set_font("Arial", 'B', 16)
     pdf.cell(190, 10, titulo_dinamico.upper(), 1, 1, 'C')
     pdf.ln(5)
 
     for secao, info in dados.items():
-        # Título da Seção (Faixa Cinza)
+        # Título da Seção
         pdf.set_font("Arial", 'B', 11)
         pdf.set_fill_color(230, 230, 240)
         pdf.cell(190, 7, secao, 0, 1, 'L', fill=True)
-        pdf.set_font("Arial", size=10)
         pdf.ln(1)
         
-        # Conteúdo da Seção
+        # Conteúdo da Seção com correção de margem
+        pdf.set_font("Arial", size=10)
         for k, v in info.items():
             if v:
-                # Tratamento para não bugar com acentos
-                linha = f"{k}: {v}".encode('latin-1', 'replace').decode('latin-1')
-                # multi_cell é vital para o HISTÓRICO não sumir
-                pdf.multi_cell(190, 6, linha, 0, 'L')
+                # Texto formatado
+                txt_limpo = f"{k}: {v}".encode('latin-1', 'replace').decode('latin-1')
+                # O segredo está aqui: multi_cell com largura de 180 para garantir a margem direita
+                pdf.multi_cell(180, 6, txt_limpo, 0, 'L')
         pdf.ln(3)
 
-    # Anexos (Fotos)
+    # Anexos
     for foto, label in [(f_susp, "DO SUSPEITO"), (f_mat, "DO MATERIAL")]:
         if foto:
             try:
@@ -61,12 +61,12 @@ def gerar_pdf_operacional(titulo_dinamico, dados, f_susp, f_mat):
                 pdf.cell(190, 10, f"ANEXO - FOTO {label}", 0, 1, 'L')
                 img = Image.open(foto).convert("RGB")
                 img_io = io.BytesIO()
-                img.save(img_io, format='JPEG', quality=80)
+                img.save(img_io, format='JPEG', quality=70)
                 img_io.seek(0)
-                pdf.image(img_io, x=10, y=30, w=120)
+                pdf.image(img_io, x=10, y=30, w=130)
             except: pass
     
-    # Conversão de segurança para download
+    # Retorno binário seguro
     saida = pdf.output(dest='S')
     return bytes(saida) if not isinstance(saida, str) else saida.encode('latin-1', 'replace')
 
@@ -88,7 +88,7 @@ with t_vitimas:
     for i in range(1, 3):
         with st.expander(f"👤 Vítima 0{i}"):
             vn = st.text_input(f"Nome V{i}")
-            vd = st.text_input(f"Documento V{i}")
+            vd = st.text_input(f"Doc V{i}")
             if vn: v_dados[f"Vítima 0{i}"] = f"{vn} (Doc: {vd})"
 
 with t_suspeitos:
@@ -96,19 +96,18 @@ with t_suspeitos:
     for i in range(1, 4):
         with st.expander(f"🚨 Suspeito 0{i}"):
             sn = st.text_input(f"Nome S{i}")
-            sd = st.text_input(f"Documento S{i}")
-            sm = st.text_input(f"Nome da Mãe S{i}") # MANTIDO
+            sd = st.text_input(f"Doc S{i}")
+            sm = st.text_input(f"Mãe S{i}")
             if sn: s_dados[f"Suspeito 0{i}"] = f"Nome: {sn} | Mãe: {sm} | Doc: {sd}"
 
 with t_relato:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
     crimes_tco = ["Ameaça", "Lesão Corporal Leve", "Desobediência", "Desacato", "Dano", "Vias de Fato"]
-    crimes_bo = ["Roubo", "Furto", "Tráfico de Drogas", "Homicídio", "Maria da Penha", "Porte de Arma", "Outros"]
-    
+    crimes_bo = ["Roubo", "Furto", "Tráfico de Drogas", "Homicídio", "Maria da Penha", "Outros"]
     tipo = st.selectbox("Natureza da Ocorrência", crimes_tco + crimes_bo)
-    # AQUI ESTÁ O QUE VAI APARECER NO PDF
-    relato_digitado = st.text_area("Histórico Detalhado", placeholder="Descreva a ocorrência aqui...", height=200)
-    materiais_digitados = st.text_area("Objetos e Apreensões", placeholder="Descreva o que foi apreendido...")
+    
+    relato_txt = st.text_area("Histórico Detalhado", height=200)
+    materiais_txt = st.text_area("Objetos e Apreensões")
     st.markdown('</div>', unsafe_allow_html=True)
 
 with t_final:
@@ -116,29 +115,20 @@ with t_final:
     f_mat = st.file_uploader("📸 Foto Material", type=['jpg','png','jpeg'])
     
     if st.button("🏁 FINALIZAR E GERAR DOCUMENTO", use_container_width=True):
-        # Lógica de Título
         tit = "Termo Circunstanciado de Ocorrencia" if tipo in crimes_tco else "Boletim de Ocorrencia"
         
         info_pdf = {
-            "EQUIPE E LOCAL": {"Viatura": prefixo, "Agentes": agentes, "Endereço": end_fato},
-            "ENVOLVIDOS (VITIMAS)": v_dados,
-            "ENVOLVIDOS (SUSPEITOS)": s_dados,
-            "HISTORICO DA OCORRENCIA": {"Natureza": tipo, "Relato": relato_digitado, "Apreensoes": materiais_digitados}
+            "DADOS DA EQUIPE": {"Viatura": prefixo, "Agentes": agentes, "Local": end_fato},
+            "VITIMAS": v_dados,
+            "SUSPEITOS": s_dados,
+            "RELATO DA OCORRENCIA": {"Natureza": tipo, "Historico": relato_txt, "Apreensoes": materiais_txt}
         }
         
         try:
-            arquivo_final = gerar_pdf_operacional(tit, info_pdf, f_susp, f_mat)
+            arquivo = gerar_pdf_operacional(tit, info_pdf, f_susp, f_mat)
+            st.download_button(label=f"⬇️ BAIXAR {tit.upper()}", data=arquivo, file_name="RELATORIO.pdf", mime="application/pdf")
             
-            st.download_button(
-                label=f"⬇️ BAIXAR {tit.upper()}",
-                data=arquivo_final,
-                file_name=f"{tit.replace(' ', '_')}.pdf",
-                mime="application/pdf"
-            )
-            
-            # WhatsApp
             link_wa = f"https://wa.me/?text={urllib.parse.quote(f'🛡️ *{tit.upper()}*\n🚨 *Natureza:* {tipo}\n🚔 *Viatura:* {prefixo}')}"
-            st.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📲 NOTIFICAR VIA WHATSAPP</button></a>', unsafe_allow_html=True)
+            st.markdown(f'<a href="{link_wa}" target="_blank"><button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">📲 NOTIFICAR WHATSAPP</button></a>', unsafe_allow_html=True)
         except Exception as e:
-            st.error(f"Erro ao processar PDF: {e}")
-        
+            st.error(f"Erro: {e}")
