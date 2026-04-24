@@ -65,20 +65,24 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
     if f_susp:
         pdf.add_page()
         pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
-        Image.open(f_susp).convert("RGB").save("s.jpg")
-        pdf.image("s.jpg", x=10, y=30, w=100)
+        img_s = Image.open(f_susp).convert("RGB")
+        img_byte_arr = io.BytesIO()
+        img_s.save(img_byte_arr, format='JPEG')
+        pdf.image(img_byte_arr, x=10, y=30, w=100)
     
     if f_mat:
         pdf.add_page()
         pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
-        Image.open(f_mat).convert("RGB").save("m.jpg")
-        pdf.image("m.jpg", x=10, y=30, w=100)
+        img_m = Image.open(f_mat).convert("RGB")
+        img_byte_arr_m = io.BytesIO()
+        img_m.save(img_byte_arr_m, format='JPEG')
+        pdf.image(img_byte_arr_m, x=10, y=30, w=100)
 
-    return pdf.output()
+    # Retorno em bytes para evitar o erro do Streamlit
+    return bytes(pdf.output(dest='S'), encoding='latin-1')
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
-# Estrutura de Abas (Tudo mantido!)
 t_geral, t_vitimas, t_suspeitos, t_relato, t_fotos = st.tabs([
     "📍 Local/Guarnição", "👤 Vítimas", "🚨 Suspeitos", "📖 Relato/Apreensão", "📄 Finalizar"
 ])
@@ -113,7 +117,7 @@ with t_suspeitos:
 
 with t_relato:
     st.markdown('<div class="tactic-card">', unsafe_allow_html=True)
-    tipo_crime = st.selectbox("Natureza da Ocorrência (Tipificação)", [
+    tipo_crime = st.selectbox("Natureza da Ocorrência", [
         "-- BAIXO POTENCIAL (TCO) --",
         "Ameaça (Art. 147)", "Lesão Corporal Leve", "Desobediência / Desacato",
         "-- MÉDIO/ALTO POTENCIAL (BO) --",
@@ -133,40 +137,36 @@ with t_fotos:
     st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("🏁 FINALIZAR E GERAR PDF", use_container_width=True):
-        resumo = {
+        resumo_dict = {
             "1. EQUIPE E LOCAL": {"Viatura": prefixo, "Agentes": agentes, "Local": end_fato},
             "2. VÍTIMAS": v_dados,
             "3. SUSPEITOS": s_dados,
             "4. OCORRÊNCIA": {"Natureza": tipo_crime, "Histórico": relato, "Apreensões": materiais}
         }
-        pdf = gerar_pdf_completo(resumo, f_susp, f_mat)
-        st.download_button("⬇️ 1. BAIXAR PDF B.O. FÁCIL", data=pdf, file_name="BO_FACIL_RELATORIO.pdf")
+        
+        pdf_out = gerar_pdf_completo(resumo_dict, f_susp, f_mat)
+        
+        st.download_button(
+            label="⬇️ 1. BAIXAR PDF B.O. FÁCIL",
+            data=pdf_out,
+            file_name="BO_FACIL_RELATORIO.pdf",
+            mime="application/pdf"
+        )
 
         # --- BOTÃO WHATSAPP ---
-        resumo_texto = (
+        msg = (
             f"🛡️ *B.O. FÁCIL - RELATÓRIO OPERACIONAL*\n\n"
             f"🚨 *NATUREZA:* {tipo_crime}\n"
             f"📍 *LOCAL:* {end_fato}\n"
-            f"🚔 *VIATURA:* {prefixo}\n"
-            f"👥 *EQUIPE:* {agentes}\n\n"
-            f"📂 *O arquivo PDF completo foi gerado e está pronto para envio.*"
+            f"🚔 *VIATURA:* {prefixo}\n\n"
+            f"📂 *PDF pronto para envio.*"
         )
-        texto_url = urllib.parse.quote(resumo_texto)
+        url = f"https://wa.me/?text={urllib.parse.quote(msg)}"
         
         st.markdown(f"""
             <div style="margin-top: 15px;">
-                <a href="https://wa.me/?text={texto_url}" target="_blank" style="text-decoration: none;">
-                    <button style="
-                        width:100%; 
-                        background-color:#25D366; 
-                        color:white; 
-                        border:none; 
-                        padding:12px; 
-                        border-radius:8px; 
-                        font-weight:bold; 
-                        font-size: 16px;
-                        cursor:pointer;
-                        box-shadow: 0px 4px 6px rgba(0,0,0,0.2);">
+                <a href="{url}" target="_blank" style="text-decoration: none;">
+                    <button style="width:100%; background-color:#25D366; color:white; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">
                         📲 2. NOTIFICAR VIA WHATSAPP
                     </button>
                 </a>
