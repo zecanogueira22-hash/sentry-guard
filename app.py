@@ -5,9 +5,10 @@ from datetime import datetime
 from PIL import Image
 import io
 
-# 1. CONFIGURAÇÃO DE NOME E ÍCONE
+# 1. CONFIGURAÇÃO DE NOME E ÍCONE (COM O NOME CORRETO DA IMAGEM)
 try:
-    img_icone = Image.open("1000936543.webp")
+    # Ajustado para o nome que aparece no seu GitHub
+    img_icone = Image.open("20251007185025621.webp")
 except:
     img_icone = "🛡️"
 
@@ -17,7 +18,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- ESTÉTICA TÁTICA (PALETA DO USUÁRIO) ---
+# --- ESTÉTICA TÁTICA ---
 st.markdown(f"""
     <style>
     .stApp {{ background: #1A334A; color: white; }}
