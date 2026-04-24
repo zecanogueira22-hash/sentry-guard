@@ -59,27 +59,38 @@ def gerar_pdf_completo(dados, f_susp, f_mat):
         pdf.set_font("Arial", size=9)
         if isinstance(info, dict):
             for k, v in info.items():
-                if v: pdf.multi_cell(190, 6, f"{k}: {v}", 0, 'L')
+                if v: 
+                    # Limpa caracteres especiais/emojis que travam o PDF
+                    texto_limpo = f"{k}: {v}".encode('ascii', 'ignore').decode('ascii')
+                    pdf.multi_cell(190, 6, texto_limpo, 0, 'L')
         pdf.ln(2)
 
+    # Anexo Foto Suspeito
     if f_susp:
-        pdf.add_page()
-        pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
-        img_s = Image.open(f_susp).convert("RGB")
-        img_byte_arr = io.BytesIO()
-        img_s.save(img_byte_arr, format='JPEG')
-        pdf.image(img_byte_arr, x=10, y=30, w=100)
+        try:
+            pdf.add_page()
+            pdf.cell(190, 10, "ANEXO - FOTO DO SUSPEITO", 0, 1, 'L')
+            img_s = Image.open(f_susp).convert("RGB")
+            img_byte_arr = io.BytesIO()
+            img_s.save(img_byte_arr, format='JPEG')
+            pdf.image(img_byte_arr, x=10, y=30, w=100)
+        except:
+            pass
     
+    # Anexo Foto Material
     if f_mat:
-        pdf.add_page()
-        pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
-        img_m = Image.open(f_mat).convert("RGB")
-        img_byte_arr_m = io.BytesIO()
-        img_m.save(img_byte_arr_m, format='JPEG')
-        pdf.image(img_byte_arr_m, x=10, y=30, w=100)
+        try:
+            pdf.add_page()
+            pdf.cell(190, 10, "ANEXO - MATERIAL APREENDIDO", 0, 1, 'L')
+            img_m = Image.open(f_mat).convert("RGB")
+            img_byte_arr_m = io.BytesIO()
+            img_m.save(img_byte_arr_m, format='JPEG')
+            pdf.image(img_byte_arr_m, x=10, y=30, w=100)
+        except:
+            pass
 
-    # Retorno em bytes para evitar o erro do Streamlit
-    return bytes(pdf.output(dest='S'), encoding='latin-1')
+    # Retorno corrigido para evitar o TypeError
+    return pdf.output(dest='S').encode('latin-1')
 
 st.markdown("<h1>🛡️ B.O. FÁCIL</h1>", unsafe_allow_html=True)
 
@@ -172,4 +183,4 @@ with t_fotos:
                 </a>
             </div>
             """, unsafe_allow_html=True)
-    
+        
